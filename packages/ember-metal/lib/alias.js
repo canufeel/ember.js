@@ -28,33 +28,36 @@ AliasedProperty.prototype = Object.create(Descriptor.prototype);
 
 AliasedProperty.prototype.setup = function(obj, keyName) {
   assert(`Setting alias '${keyName}' on self`, this.altKey !== keyName);
-  let meta = metaFor(obj);
-  if (meta.peekWatching(keyName)) {
-    addDependentKeys(this, obj, keyName, meta);
+  let m = metaFor(obj);
+  if (m.peekWatching(keyName)) {
+    addDependentKeys(this, obj, keyName, m);
   }
 };
 
-AliasedProperty.prototype._addDependentKeyIfMissing = function(obj, keyName) {
-  let meta = metaFor(obj);
-  if (!meta.peekDeps(this.altKey, keyName)) {
-    addDependentKeys(this, obj, keyName, meta);
+AliasedProperty.prototype.teardown = function(obj, keyName) {
+  let m = metaFor(obj);
+  if (m.peekWatching(keyName)) {
+    removeDependentKeys(this, obj, keyName, m);
   }
 };
 
-AliasedProperty.prototype._removeDependentKeyIfAdded = function(obj, keyName) {
-  let meta = metaFor(obj);
-  if (meta.peekDeps(this.altKey, keyName)) {
-    removeDependentKeys(this, obj, keyName, meta);
-  }
+AliasedProperty.prototype.willWatch = function(obj, keyName) {
+  addDependentKeys(this, obj, keyName, metaFor(obj));
 };
 
-AliasedProperty.prototype.willWatch = AliasedProperty.prototype._addDependentKeyIfMissing;
-AliasedProperty.prototype.didUnwatch = AliasedProperty.prototype._removeDependentKeyIfAdded;
-AliasedProperty.prototype.teardown = AliasedProperty.prototype._removeDependentKeyIfAdded;
+AliasedProperty.prototype.didUnwatch = function(obj, keyName) {
+  removeDependentKeys(this, obj, keyName, metaFor(obj));
+};
+
+const CONSUMED = {};
 
 AliasedProperty.prototype.get = function AliasedProperty_get(obj, keyName) {
-  this._addDependentKeyIfMissing(obj, keyName);
-
+  let meta = metaFor(obj);
+  let cache = meta.writableCache();
+  if (cache[keyName] !== CONSUMED) {
+    cache[keyName] = CONSUMED;
+    addDependentKeys(this, obj, keyName, meta);
+  }
   return get(obj, this.altKey);
 };
 
